@@ -16,7 +16,7 @@
 
 The project is written in **Rust** for its performance and handling low-level tasks like bulk data import. Its ecosystem has a library called orientdb-client, which directly interacts with OrientDB’s binary protocol.
 
-We have no code written in *C*,but due to *Rust* dependencies that require *C*, it has to be installed.
+We have no code written in *C*, but due to *Rust* dependencies that require *C*, it has to be installed.
 
 Since OrientDB is Java-based, it requires a *Java* to run. We recommend *Java 11*, because OrientDB is does not work properly with newer versions due to changes in internal Java APIs, causing a lot of runtime issues.
 
@@ -69,7 +69,7 @@ A CLI tool that:
 
 ![System Architecture Diagram](./images/Architecture_diagram.svg)
 
-Make sure the **OrientDB** server is running, so that data processing possible.
+Make sure the **OrientDB** server is running, so that data processing is possible.
 
 ## 3. Prerequisites
 
