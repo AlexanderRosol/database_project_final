@@ -125,7 +125,7 @@ Key optimization strategies:
 
 Here's a conceptual diagram of how the components interact:
 
-![System Architecture Diagram](./images/Architecture_diagram.svg)
+![System Architecture Diagram](./Architecture_diagram.svg)
 
 This modular, decoupled architecture allows for:
 - Easy re-running or modification of the seeding process.
