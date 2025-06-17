@@ -22,6 +22,16 @@
   - [Overview of Design Decisions](#overview-of-design-decisions)
   - [Implementation Steps and Rationale](#implementation-steps-and-rationale)
 
+- [6.Goal Implementation Details](#6-goal-implementation-details)
+
+- [7.Team Roles and Contributions](#7-team-roles-and-contributions)
+
+- [8. Self-Evaluation](#8-self-evaluation)
+  - [Efficiency and Performance Discussion](#efficiency-and-performance-discussion)
+  - [Limitations and Identified Shortcomings](#limitations-and-identified-shortcomings)
+  - [Ideas for Future Improvements](#ideas-for-future-improvements)
+
+
 ## 1. Choice of Technology
 
 ### Programming Language(s)
@@ -40,7 +50,7 @@ As mentioned above, we chose **OrientDB** as our database system. It is a multi-
 We selected OrientDB because:
 
 - **Native graph support** with vertices and edges, ideal for our data.
-- **Bulk loading optimizations** (e.g., disabling WAL, cache tuning) to boost insert performance (we did not know at the time that this will cause us headaches).
+- **Bulk loading optimizations** like cache tuning to boost insert performance.
 - **Flexible schema** allowing dynamic creation of classes and properties.
 - **Lightweight setup**, running embedded or remotely with minimal dependencies.
 - We would have chosen *neo4j*, but it was not allowed, due to it being used in our laboratory classes.
@@ -353,3 +363,327 @@ The key design decision was to optimize data import performance by carefully man
 
 8. **Restoring Production Settings**  
    After data import, we revert database settings like cache size back to production-appropriate values to ensure durability and performance for normal operations.
+
+## 6. Goal Implementation Details
+
+This section explains how each project goal was addressed through database queries. It includes query execution details, logic, and the results retrieved during knowledge graph exploration.
+
+- **Successors of `/c/en/steam_locomotive`**  
+  - **Query 1** : SELECT expand(out().asSet().label) FROM `Concept` WHERE id = :node_id
+    - **Execution time:** 1.970208ms 
+    - **Result:**
+	1 locomotive
+	2 steam
+	3 steam locomotive
+    - **Explanation:** The system attempted to retrieve all concepts that are successors, meaning "directly connected in the outgoing direction", of the node representing “steam locomotive”.
+
+- **Count Successors of `/c/en/value`**  
+  - **Query 2** : SELECT out().asSet().size() as value FROM `Concept` WHERE id = :node_id
+    - **Execution time:** 1.790208ms  
+    - **Result:** *177*  
+    - **Explanation:** The system retrieved all concepts that are successors (i.e., directly connected in the outgoing direction) of the node representing “value”.
+
+- **Predecessors of `Q40157`**  
+  - **Query 3** : SELECT expand(in().asSet().label) FROM `Concept` WHERE id = :node_id
+    - **Execution time:** 792.708µs 
+    - **Result:**  
+      1. the floor is lava  
+      2. lava lamp  
+      3. lava lake  
+      4. primary magma  
+      5. magma  
+    - **Explanation:** Identifies all incoming nodes connected to `Q40157`.
+
+- **Predecessors of `/c/en/country`**  
+  - **Query 4** : SELECT in().asSet().size() as value FROM `Concept` WHERE id = :node_id
+    - **Execution time:** 4.915084ms  
+    - **Result:** *735*  
+    - **Explanation:** The system retrieved all concepts that are predecessors (i.e., directly connected in the incoming direction) of the node representing “country”.
+
+- **Neighbors of `/c/en/spectrogram`**  
+  - **Query 5** : SELECT expand(both().asSet().label) FROM `Concept` WHERE id = :node_id
+    - **Execution time:** 337.958µs  
+    - **Result:** *None returned*  
+    - **Explanation:** A neighbor query returns all directly connected nodes, regardless of direction, so both directions.
+
+- **Count of Neighbors of `/c/en/jar`**  
+  - **Query 6** : SELECT both().asSet().size() as value FROM `Concept` WHERE id = :node_id
+    - **Execution time:** 2.678291ms  
+    - **Result:** 373  
+    - **Explanation:** Counts all neighboring nodes directly connected to "jar".
+
+- **Grandchildren of `Q676`**  
+  - **Query 7** : SELECT expand(out().out().asSet().label) FROM `Concept` WHERE id = :node_id
+    - **Execution time:** 545.791µs  
+    - **Result:**  
+      - genre fiction, literary form, literary class, art genre, genre, literary genre, form, written work, creative work, group of literary works, serial  
+    - **Explanation:** Explores two levels of hierarchy to find concepts that are two steps down from `Q676`.
+
+- **Grandparents of `/c/en/ms_dos`**  
+  - **Query 8** : SELECT expand(in().in().asSet().label) FROM `Concept` WHERE id = :node_id
+    - **Execution time:** 513.084µs  
+    - **Result:**
+	1. dr dos
+	2. ms dos
+	3. pc dos
+	4. 8.3
+	5. dos
+	6. drive letter
+	7. print screen
+    - **Explanation:** Retrieves nodes two levels above ms_dos inward.
+
+- **Total Nodes in Graph**  
+  - **Query 9** : SELECT COUNT(*) as value FROM `Concept`
+    - **Execution time:** 4.1337995s  
+    - **Result:** 2,160,968  
+    - **Explanation:** Counts all concept nodes in the dataset.
+
+- **Nodes with No Successors**  
+  - **Query 10** : SELECT count(*) as value FROM `Concept` WHERE out().asSet().size() = 0
+    - **Execution time:** 34.456729s  
+    - **Result:** 649,184  
+    - **Explanation:** Identifies nodes with no outgoing edges.
+
+- **Nodes with No Predecessors**  
+  - **Query 11** : SELECT count(*) as value FROM `Concept` WHERE in().asSet().size() = 0
+    - **Execution time:** 30.909017417s 
+    - **Result:** 1,129,781  
+    - **Explanation:** Finds nodes with no incoming edges.
+
+- **Nodes with the Most Neighbors**  
+  - **Query 12** : SELECT label FROM `Concept` WHERE both().asSet().size() = (SELECT max(both().asSet().size()) FROM `Concept`)
+    - **Execution time:** 127.836150583s 
+    - **Result:** `slang`  
+    - **Explanation:** Node with the highest degree of connectivity in both directions. Make sure to not count them twice.
+
+- **Nodes with a Single Neighbor**  
+  - **Query 13** : SELECT count(*) as value FROM `Concept` WHERE both().asSet().size() = 1
+    - **Execution time:** 63.250132291s  
+    - **Result:** 1,276,217  
+    - **Explanation:** Indicates sparse or leaf nodes in the graph.
+
+- **Rename /c/en/transportation_topic/n**
+  - **Query 14** : UPDATE `Concept` SET id = :new_id, label = :new_label WHERE id = :node_id
+    - **Parameters:**
+	node_id = /c/en/transportation_topic/n
+	new_id = new_id
+	new_label = new_label
+    - **Execution time:** 2.347ms
+    - **Result:**
+	OK - Node renamed successfully
+    - **Explanation:** Indicates a structural update to the knowledge graph.
+
+- **Similar Nodes to** `/c/en/emission_nebula`  
+  - **Query 15**:
+    ```sql
+    SELECT expand(
+      unionall(
+        (
+          MATCH {
+            class: Concept,
+            where: (id = :node_id)
+          }.outE() {as: e1}
+           .in      {as: child}
+           .inE()   {as: e2, where: (@class = $matched.e1.@class)}
+           .out     {as: similar_node, where: (id <> :node_id)}
+          RETURN DISTINCT similar_node.label as value
+        ),
+        (
+          MATCH {
+            class: Concept,
+            where: (id = :node_id)
+          }.inE()  {as: e1}
+           .out    {as: parent}
+           .outE() {as: e2, where: (@class = $matched.e1.@class)}
+           .in     {as: similar_node, where: (id <> :node_id)}
+          RETURN DISTINCT similar_node.label as value
+        )
+      ).asSet()
+    )
+    ```
+    - **Parameters:**
+	node_id = /c/en/emission_nebula
+    - **Execution time:** `67.373917ms`  
+    - **Result (sample):**
+	1. emit
+	2. emissions test
+	3. solar nebula
+	4. preplanetary nebula
+	5. diffuse nebula
+	6. emission line
+	7. protoplanetary nebula
+	8. stellar nebula
+	9. dark nebula
+	10. act
+	11. reflection nebula
+	12. planetary nebula
+	13. issue
+    - **Explanation:** Uses semantic or lexical similarity via shared parent/child edge types to identify related concepts in the graph.
+
+- **Relatedness Between Two Nodes**  
+  - **Query 16 (Instance 1)** :
+    ```sql
+    SELECT expand(shortestPath(
+            (SELECT FROM `Concept` WHERE id = :node1_id),
+            (SELECT FROM `Concept` WHERE id = :node2_id),
+            'BOTH'
+    ).label) as value
+    ´´´
+    - **Parameters:**
+	node1_id = /c/en/flower
+	node2_id = /c/en/spacepower   
+    - **Execution time:** 92.495209ms  
+    - **Result:**
+	1. flower
+	2. plant
+	3. power
+	4. spacepower
+  
+  - **Query 16 (Instance 2)** :
+    ```sql
+    SELECT expand(shortestPath(
+            (SELECT FROM `Concept` WHERE id = :node1_id),
+            (SELECT FROM `Concept` WHERE id = :node2_id),
+            'BOTH'
+    ).label) as value
+    ´´´
+    - **Parameters:**
+	node1_id = /c/en/uchuva
+	node2_id = /c/en/square_sails/n 
+    - **Execution time:** 129.800916ms  
+    - **Result:**
+	1. uchuva
+	2. tomatillo
+	3. tomato
+	4. sauce
+	5. slang
+	6. square
+	7. square sail
+	8. square sails  
+    - **Explanation:** Measures conceptual proximity via shared neighbors or embeddings.
+
+- **Distant Synonyms (e.g., `/c/en/defeatable` at distance 2)**  
+  - **Query 17 (Instance 1)** :
+    ```sql
+    SELECT DISTINCT result.label
+FROM (
+  MATCH
+    {class: Concept, where: (id = '/c/en/defeatable'), as: start}
+      .bothE('$r$Synonym', '$r$Antonym') {as: e1}
+      .bothV() {as: v1}
+      .bothE('$r$Synonym', '$r$Antonym') {as: e2}
+      .bothV() {as: result}
+  RETURN
+    start,
+    result,
+    [e1, e2] AS path
+)
+WHERE
+  (path[(@class = '$r$Antonym')].size() % 2) = 0
+  AND shortestPath(start, result, "BOTH", ['$r$Synonym', '$r$Antonym']).size() = 3
+
+    ´´´
+    - **Execution time:** 27.036625ms  
+    - **Result:**
+	1 conquerable
+	2 weak
+	3 attainable
+	4 beatable
+	5 possible
+	6 subduable
+	7 subjugable
+	8 superable
+	9 surmountable
+	10 vanquishable
+	11 vincible
+    - **Explanation:** Traverses `Synonym` relations across multiple hops to identify conceptually close terms.
+  - **Query 17 (Instance 2): `/c/en/telegraphically` at distance 5**
+    - **Execution time:** 481.602458ms  
+    - **Result:**
+	1. momentarily
+	2. concisely
+	3. fleetingly
+	4. hastily
+	5. quickly
+	6. shortly
+	7. succinctly
+	8. summarily
+	9. temporarily
+	10. transiently
+	11. awhile
+	12. early
+	13. in nutshell
+    - **Explanation:** Traverses `Synonym` relations across multiple hops to identify conceptually close terms.
+
+- **Distant Antonyms**  
+  - **Query 18 (Instance 1): `/c/en/automate` at distance 3** :
+    ```sql
+    SELECT DISTINCT result.label
+FROM (
+  MATCH
+    {class: Concept, where: (id = '/c/en/automate'), as: start}
+      .bothE('$r$Synonym', '$r$Antonym') {as: e1}
+      .bothV() {as: v1}
+      .bothE('$r$Synonym', '$r$Antonym') {as: e2}
+      .bothV() {as: v2}
+      .bothE('$r$Synonym', '$r$Antonym') {as: e3}
+      .bothV() {as: result}
+  RETURN
+    start,
+    result,
+    [e1, e2, e3] AS path
+)
+WHERE
+  (path[(@class = '$r$Antonym')].size() % 2) = 1
+  AND shortestPath(start, result, "BOTH", ['$r$Synonym', '$r$Antonym']).size() = 4
+    ´´´
+    - **Execution time:** 35.141417ms  
+    - **Result:**
+	1. civilize
+	2. cultivate
+	3. refine
+	4. tame
+	5. teach
+	6. temper
+	7. personify
+  - **Query 18 (Instance 2):** `/c/en/rollercoaster` at distance 6  
+    - **Execution time:** 41.286930208s  
+    - **Result:**
+	1. fill
+	2. driving
+	3. driving straight
+	4. go
+	5. go straight
+	6. going
+	7. going straight
+	8. stand
+	9. stand still
+	10. stay
+	11. stay straight
+	12. still
+	13. straight
+	14. twist
+	15. unbend
+	16. advance
+	17. level  
+    - **Explanation:** Alternates through `Synonym` and `Antonym` edges; ensures path ends in opposite polarity using modulo logic on antonym edge count.
+
+## 7. Team Roles and Contributions
+
+We are **Michał Rawski** and **Alexander Rosol**. We both collaborated to solve the problems, choosing whichever solutions we felt were best. In the end, most of **Michał Rawski**'s contributions were included in the final version, as he has experience with Rust.
+
+**Alexander Rosol** handled testing on a virtual machine and wrote the majority of the documentation with much guidance from **Michał Rawski**, since **Alexander Rosol** is not familiar with Rust.
+
+## 8. Self-Evaluation
+
+### Efficiency and performance discussion
+
+We are happy with how the project went, as we met most milestones—often before they were even checked. Based on feedback and observed behavior, the performance appears to be good, and we believe our implementation is quite efficient.
+
+### Limitations and Identified Shortcomings
+
+One major limitation was running OrientDB on Windows, which led to a number of OS-specific errors. Almost all official documentation and community resources primarily target macOS, and the overall ecosystem is small. This made fixing issues nearly impossible at times. OrientDB itself was frequently the bottleneck in our workflow—for example, using its native seeding process proved so cumbersome that we opted to implement our own solution.
+
+### Ideas for Future Improvements
+
+Looking forward, we would like to configurable cache sizing. However, this depends heavily on the version of OrientDB, and modifying the version can break compatibility with other parts of the system.
