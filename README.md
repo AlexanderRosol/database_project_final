@@ -15,6 +15,9 @@
   - [Installation of Dependencies (Ubuntu/Debian)](#installation-of-dependencies-ubuntudebian)
   - [Hardware or Environment Assumptions](#hardware-or-environment-assumptions)
 
+- [4. Project Setup and Execution](#4-project-setup-and-execution)
+  - [Step-by-Step Guide](#step-by-step-guide)
+
 ## 1. Choice of Technology
 
 ### Programming Language(s)
@@ -213,3 +216,100 @@ Now everything should be installed that is needed to start the seeding process a
 - 64-bit Linux system (Ubuntu/Debian).
 - At least 8 GB RAM (the more the better).
 - Allow access from the OrientDB server at port 2480 (HTTP). Make sure the port is not blocked manually.
+
+## 4. Project Setup and Execution
+
+Presuming all required software has been successfully installed, here is how to correctly set up and run the system.
+
+---
+
+#### Directory Layout
+
+Below is the expected file structure for the project:
+
+```
+/Rawski_Rosol
+├── build/
+│   └── cskg.tsv
+├── orient-rs/
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── main.rs
+│   │   ├── seed/
+│   │   │   └── seed.rs
+│   │   └── dbcli/
+│   │       └── dbcli.rs
+└── orientdb-community-3.2.38/
+    └── bin/
+        └── server.sh
+```
+
+---
+
+### Step-by-Step Guide
+
+#### Start the OrientDB Server
+
+Navigate to the OrientDB `bin` directory and run the server:
+
+```bash
+cd /path/to/Project_file/orientdb-community-3.2.38/bin
+./server.sh
+```
+
+When prompted, set the username to `root` and the password also to `root`.
+
+#### Run the Rust Data Loading Logic (`seed.rs`)
+
+In a new terminal, navigate to the `orient-rs` directory and run:
+
+```bash
+cd /path/to/Project_file/orient-rs
+cargo run
+```
+
+This will execute the logic inside `src/seed/seed.rs` (assuming `main.rs` calls the seed logic) and load data from `build/cskg.tsv` into the running OrientDB instance.
+
+#### Using the Database CLI (`dbcli.rs`)
+
+The CLI code is inside `src/dbcli/dbcli.rs` and depends on the OrientDB server running.
+
+##### Add Required Dependency
+
+Make sure your `Cargo.toml` contains:
+
+```toml
+[dependencies]
+orientdb-client = "0.6.0"
+```
+
+#### Prepare the CLI for Running
+
+To run or build the CLI, you can temporarily replace the content of `src/main.rs` with that of `src/dbcli/dbcli.rs` by copying:
+
+```bash
+# Backup original main.rs
+cp src/main.rs src/main_backup.rs
+
+# Replace main.rs with dbcli.rs
+cp src/dbcli/dbcli.rs src/main.rs
+```
+
+#### Compile the CLI in Release Mode
+
+```bash
+cargo build --release
+```
+
+This will generate a binary at:
+
+```
+target/release/orient-rs
+```
+
+You can rename this binary to `dbcli` if you like:
+
+```bash
+mv target/release/orient-rs target/release/dbcli
+```
+
