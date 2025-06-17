@@ -1,49 +1,14 @@
 # Michał Rawski, Alexander Rosół
 # Project Documentation – Table of Contents
 
-1. [Choice of Technology](#choice-of-technology)
-   - Programming language(s)
-   - Database system
-   - Libraries and tools
+- [1. Choice of Technology](#1-choice-of-technology)
+  - [Programming Language(s)](#programming-languages)
+  - [Database System](#database-system)
+  - [Extra](#extra)
 
-2. [System Architecture](#system-architecture)
-   - Description of components and interactions
-   - (Optional) Architecture diagram
-
-3. [Prerequisites](#prerequisites)
-   - Software requirements
-   - Installation of dependencies
-   - Hardware or environment assumptions
-
-4. [Installation and Setup Instructions](#installation-and-setup-instructions)
-   - Step-by-step setup guide
-   - How to run and test the system
-
-5. [Design and Implementation Process](#design-and-implementation-process)
-   - Overview of design decisions
-   - Implementation steps and rationale
-
-6. [Goal Implementation Details](#goal-implementation-details)
-   - Explanation of how each project goal was addressed
-   - Database queries and underlying logic
-
-7. [Team Roles and Contributions](#team-roles-and-contributions)
-   - Names of team members
-   - Who did what (development, design, documentation, testing, etc.)
-
-8. [Results](#results)
-   - Example outputs and use cases
-   - Performance metrics (e.g. timings)
-   - Screenshots or sample runs
-
-9. [User Manual](#user-manual)
-   - How to use the `dbcli` command-line utility
-   - How to reproduce results step-by-step
-
-10. [Self-Evaluation](#self-evaluation)
-    - Efficiency and performance discussion
-    - Limitations and identified shortcomings
-    - Ideas for future improvements
+- [2. System Architecture](#2-system-architecture)
+  - [Description of Components and Interactions](#description-of-components-and-interactions)
+  - [Architecture Diagram (Optional)](#architecture-diagram-optional)
 
 ## 1. Choice of Technology
 
@@ -51,9 +16,10 @@
 
 The project is written in **Rust** for its performance and handling low-level tasks like bulk data import. Its ecosystem has a library called orientdb-client, which directly interacts with OrientDB’s binary protocol.
 
-We have no code written in **C**,but due to **Rust** dependencies that require **C**, it has to be installed.
+We have no code written in *C*,but due to *Rust* dependencies that require *C*, it has to be installed.
 
-Since OrientDB is Java-based, it requires a **Java** to run. We recommend **Java 11**, because OrientDB is incompatible with newer versions due to changes in internal Java APIs, causing a lot of runtime issues.
+Since OrientDB is Java-based, it requires a *Java* to run. We recommend *Java 11*, because OrientDB is does not work properly with newer versions due to changes in internal Java APIs, causing a lot of runtime issues.
+
 
 ### Database System
 
@@ -69,54 +35,41 @@ We selected OrientDB because:
 
 ### Extra
 
-- **[orientdb-client (v0.6.0)]** is the library that allows us to interact with the OrientDB binary protocol. Through it, we can create vertices and relationships, run queries and more.
+- **[orientdb-client (v0.6.0)]** is the dependency that allows us to interact with the OrientDB binary protocol. Through it, we can create vertices and relationships, run queries and more.
 
 ## 2. System Architecture
 
 ### Description of Components and Interactions
 
-The system is designed to ingest and structure a large-scale knowledge graph into an OrientDB graph database. It is composed of the following main components:
+The system seeds a large-scale knowledge graph from our given `cskg.tsv` file into an OrientDB database. These are the following components of the architecture:
 
 #### 1. **OrientDB Server**
-- Acts as the central persistent storage engine.
-- Handles graph modeling, indexing, and querying of vertices (`Concept`) and edges (typed relationships).
-- Must be run with **Java 11** due to compatibility issues with newer JDK versions.
-- Exposed via its native binary protocol on port `2480` (http://localhost:2480).
+- Stores and queries graph data.
+- Exposed via binary protocol at `http://localhost:2480`.
 
 #### 2. **Rust Data Seeder**
-- A command-line Rust application responsible for:
-  - Connecting to the OrientDB server.
-  - Creating and configuring the database.
-  - Parsing and ingesting data from a `.tsv` file.
-  - Dynamically generating schema (classes, properties, edge types).
-  - Performing high-performance, (optionally) multithreaded bulk inserts of both vertices and edges.
-  - Applying post-insert optimizations (e.g., deferred index creation).
-  - Resetting OrientDB's write-ahead log (WAL) and cache settings to production-safe values after import.
+A CLI tool that:
+- Connects to OrientDB and initializes the database.
+- Parses the `.tsv` file and dynamically generates schema.
+- Inserts data efficiently using:
+  - **Deferred indexing**
+  - (Optional) **cache tuning**
+  - (Optional) **multithreading**
+- Resets cache to safe values after import.
 
-Key optimization strategies:
-- **Deferred indexing**: Indexes are created *after* data is inserted to avoid overhead during bulk insertions.
-- **WAL and cache tuning**: Write-ahead log is disabled and cache size is increased during import to improve speed.
-- **Threaded execution**: Although the current configuration uses a single thread, the architecture supports multi-threaded seeding, where each thread processes a chunk of the data.
-
-#### 3. **Input Data File (`cskg.tsv`)**
-- TSV-formatted file containing concepts and relationships.
-- Each row represents a labeled edge between two concepts.
-- Parsed twice:
-  - First pass: Extracts unique concepts and relationship types.
-  - Second pass: Creates edges between concepts.
+#### 3. **Input File (`cskg.tsv`)**
+- TSV file that is our dataset.
+- Parsed in two passes:
+  1. Extract unique concepts and edge types.
+  2. Insert edges between concepts.
 
 ---
 
 ### Architecture Diagram
 
-Here's a conceptual diagram of how the components interact:
-
 ![System Architecture Diagram](./images/Architecture_diagram.svg)
 
-This modular, decoupled architecture allows for:
-- Easy re-running or modification of the seeding process.
-- Clean separation between data processing logic (Rust) and data storage (OrientDB).
-- Scalability via future parallelism and data batching.
+Make sure the **OrientDB** server is running, so that data processing possible.
 
 ## 3. Prerequisites
 
