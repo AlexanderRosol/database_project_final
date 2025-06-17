@@ -49,41 +49,27 @@
 
 ### Programming Language(s)
 
-The project is implemented in **Rust**. Rust was chosen due to its strong emphasis on memory safety, performance, and concurrency—qualities that are particularly beneficial for high-throughput, low-level tasks such as bulk data import and transformation.
+The project is written in **Rust** for its performance and handling low-level tasks like bulk data import. Its ecosystem has a library called orientdb-client, which directly interacts with OrientDB’s binary protocol.
 
-Additionally, Rust’s ecosystem provides convenient libraries (like `orientdb-client`) that allow direct interaction with the OrientDB server over its binary protocol.
+We have no code written in **C**,but due to **Rust** dependencies that require **C**, it has to be installed.
 
-However, because OrientDB is itself written in Java, a **Java Runtime Environment (JRE)** is required to run the OrientDB server. We recommend **Java 11**, as OrientDB has compatibility issues with newer Java versions (Java 17+). Specifically, OrientDB relies on certain internal Java APIs and behaviors that were changed or removed in later versions, leading to potential runtime failures or unstable behavior.
+Since OrientDB is Java-based, it requires a **Java** to run. We recommend **Java 11**, because OrientDB is incompatible with newer versions due to changes in internal Java APIs, causing a lot of runtime issues.
 
 ### Database System
 
-As teased above, the chosen database is **OrientDB**, a multi-model NoSQL database that supports graphs, documents, and key/value data structures natively. It is particularly well-suited for this project, which involves storing and querying a large-scale knowledge graph.
+As mentioned above, we chose **OrientDB** as our database system. It is a multi-model NoSQL database, which supports graphs, documents, and key/value data structures natively, which fits our dataset.
 
-OrientDB was selected for several reasons:
+We selected OrientDB because:
 
-- **Graph model support**: Natively supports vertices and edges, simplifying conceptual mapping of entities and relationships.
-- **Bulk loading optimization**: Supports specific commands (e.g., disabling WAL, altering cache size) for improving performance during high-volume inserts.
-- **Schema flexibility**: Allows for dynamically creating classes and properties on-the-fly, which suits the variability in edge types.
-- **Lightweight setup**: Can run as an embedded server or remote process, with minimal dependencies.
+- **Native graph support** with vertices and edges, ideal for our data.
+- **Bulk loading optimizations** (e.g., disabling WAL, cache tuning) to boost insert performance (we did not know at the time that this will cause us headaches).
+- **Flexible schema** allowing dynamic creation of classes and properties.
+- **Lightweight setup**, running embedded or remotely with minimal dependencies.
+- We would have chosen *neo4j*, but it was not allowed, due to it being used in our laboratory classes.
 
-### Libraries and Tools
+### Extra
 
-The project uses the following libraries and tools:
-
-- **[orientdb-client (v0.6.0)](https://crates.io/crates/orientdb-client)**: A Rust client library that provides an interface to interact with OrientDB using its binary protocol. It enables database creation, session management, and running commands like creating vertices, edges, and indexes.
-
-- **[clap (v4.5.38)](https://crates.io/crates/clap)**: Used for command-line parsing, although not prominently used in the current seeding script.
-
-- **[num_cpus (v1.16.0)](https://crates.io/crates/num_cpus)**: Provides access to the number of logical CPU cores for potential thread-based optimizations.
-
-- **[sysinfo (v0.35.1)](https://crates.io/crates/sysinfo)**: Used for accessing system-related information such as memory usage and process load (optional but useful during performance benchmarking).
-
-- **Standard Rust libraries**:
-  - `std::fs`, `std::io` for file reading.
-  - `std::collections::{HashMap, HashSet}` for data management.
-  - `std::thread` and `std::time::Instant` for parallelism and performance tracking.
-
-Together, these components enable a performant, scalable, and maintainable way to seed a graph database from TSV data and efficiently support complex graph queries.
+- **[orientdb-client (v0.6.0)]** is the library that allows us to interact with the OrientDB binary protocol. Through it, we can create vertices and relationships, run queries and more.
 
 ## 2. System Architecture
 
@@ -293,16 +279,14 @@ Now everything should be installed that is needed to start the seeding process a
 - A 64-bit Linux system (Ubuntu/Debian recommended) for best compatibility and performance.
 - At least 8 GB RAM (the more the better).
 - To allow access from the OrientDB server at localhost port 2480 (HTTP), make sure the port is not blocked.
-- Multi-core CPU (4 cores or more) to benefit from parallel vertex and edge insertion, if possible.
-- SSD storage preferred for faster database and file I/O operations, if possible.
 
-### 4. Project Setup and Execution
+# 4. Project Setup and Execution
 
 Presuming all required software has been successfully installed, here’s how to correctly set up and run the system.
 
 ---
 
-### 4.1 Directory Layout
+## 4.1 Directory Layout
 
 Below is the expected file structure for the project:
 
@@ -311,8 +295,13 @@ Below is the expected file structure for the project:
 ├── build/
 │   └── cskg.tsv
 ├── orient-rs/
+│   ├── Cargo.toml
 │   ├── src/
-│   └── Cargo.toml
+│   │   ├── main.rs
+│   │   ├── seed/
+│   │   │   └── seed.rs
+│   │   └── dbcli/
+│   │       └── dbcli.rs
 └── orientdb-community-3.2.38/
     └── bin/
         └── server.sh
@@ -320,31 +309,73 @@ Below is the expected file structure for the project:
 
 ---
 
-### 4.2 Running the System
+## 4.2 Running the System
 
-1. **Start the OrientDB Server**
+### Step 1: Start the OrientDB Server
 
-Navigate to the `orientdb-community-3.2.38/bin/` directory and run the server:
+Navigate to the OrientDB `bin` directory and run the server:
 
 ```bash
 cd /path/to/Project_file/orientdb-community-3.2.38/bin
 ./server.sh
 ```
 
-When prompted set the username to `root` and password also to `root`.
+When prompted, set the username to `root` and the password also to `root`.
 
-2. **Run the Rust Loading Logic**
+### Step 2: Run the Rust Data Loading Logic (`seed.rs`)
 
-In a new terminal, navigate to the `orient-rs/` directory:
+In a new terminal, navigate to the `orient-rs` directory and run:
 
 ```bash
 cd /path/to/Project_file/orient-rs
 cargo run
 ```
 
-This will execute the data loading logic and seed the OrientDB instance with data from `build/cskg.tsv`.
+This will execute the logic inside `src/seed/seed.rs` (assuming `main.rs` calls the seed logic) and load data from `build/cskg.tsv` into the running OrientDB instance.
 
----
+### Step 3: Using the Database CLI (`dbcli.rs`)
+
+The CLI code is inside `src/dbcli/dbcli.rs` and depends on the OrientDB server running.
+
+#### 3.1 Add Required Dependency
+
+Make sure your `Cargo.toml` contains:
+
+```toml
+[dependencies]
+orientdb-client = "0.6.0"
+```
+
+#### 3.2 Prepare the CLI for Running
+
+To run or build the CLI, you can temporarily replace the content of `src/main.rs` with that of `src/dbcli/dbcli.rs` by copying:
+
+```bash
+# Backup original main.rs
+cp src/main.rs src/main_backup.rs
+
+# Replace main.rs with dbcli.rs
+cp src/dbcli/dbcli.rs src/main.rs
+```
+
+#### 3.3 Compile the CLI in Release Mode
+
+```bash
+cargo build --release
+```
+
+This will generate a binary at:
+
+```
+target/release/orient-rs
+```
+
+You can rename this binary to `dbcli` if you like:
+
+```bash
+mv target/release/orient-rs target/release/dbcli
+```
+
 
 ## 5. Design and Implementation Process
 
@@ -382,4 +413,152 @@ The key design decision was to optimize data import performance by carefully man
 
 8. **Restoring Production Settings**  
    After data import, we revert database settings like WAL flushing and cache size back to production-appropriate values to ensure durability and performance for normal operations.
+
+# 6. Goal Implementation Details
+
+This section explains how each project goal was addressed through database queries. It includes query execution details, logic, and the results retrieved during knowledge graph exploration.
+
+- **Successors of `/c/en/steam_locomotive`**  
+  - **Query 1**  
+    - **Execution time:** 490.5 µs  
+    - **Result:** *None returned*  
+    - **Explanation:** The system attempted to retrieve all concepts that are successors (i.e., directly connected in the outgoing direction) of the node representing “steam locomotive”.
+
+- **Count Successors of `/c/en/value`**  
+  - **Query 2**  
+    - **Execution time:** 4.75 ms  
+    - **Result:** *177*  
+    - **Explanation:** The system retrieved all concepts that are successors (i.e., directly connected in the outgoing direction) of the node representing “value”. A total of 177 such successor nodes were found.
+
+- **Predecessors of `Q40157`**  
+  - **Query 3**  
+    - **Execution time:** 1.02 ms  
+    - **Result:**  
+      1. the floor is lava  
+      2. lava lamp  
+      3. lava lake  
+      4. primary magma  
+      5. magma  
+    - **Explanation:** Identifies all incoming nodes connected to `Q40157`, which likely represents “lava”.
+
+- **Predecessors of `/c/en/country`**  
+  - **Query 4**  
+    - **Execution time:** 4.997 ms  
+    - **Result:** *735*  
+    - **Explanation:** The system retrieved all concepts that are predecessors (i.e., directly connected in the incoming direction) of the node representing “country”. A total of 735 such predecessor nodes were found.
+
+- **Neighbors of `/c/en/spectrogram`**  
+  - **Query 5**  
+    - **Execution time:** 595.75 µs  
+    - **Result:** *None returned*  
+    - **Explanation:** A neighbor query returns all directly connected nodes, regardless of direction, but no results were found.
+
+- **Count of Neighbors of `/c/en/jar`**  
+  - **Query 6**  
+    - **Execution time:** 10.26 ms  
+    - **Result:** 373  
+    - **Explanation:** Counts all neighboring nodes directly connected to "jar".
+
+- **Grandchildren of `Q676`**  
+  - **Query 7**  
+    - **Execution time:** 1.81 ms  
+    - **Result:**  
+      - genre fiction, literary form, literary class, art genre, genre, literary genre, form, written work, creative work, group of literary works, serial  
+    - **Explanation:** Explores two levels of hierarchy to find concepts that are two steps down from `Q676` (e.g., genre or form types).
+
+- **Grandparents of `/c/en/ms_dos`**  
+  - **Query 8**  
+    - **Execution time:** 1.06 ms  
+    - **Result:**  
+      - dr dos, ms dos, pc dos, 8.3, dos, drive letter, print screen  
+    - **Explanation:** Retrieves nodes two levels above MS-DOS to understand its higher-level classifications.
+
+- **Total Nodes in Graph**  
+  - **Query 9**  
+    - **Execution time:** 2.96 s  
+    - **Result:** 2,160,968  
+    - **Explanation:** Counts all concept nodes in the dataset.
+
+- **Nodes with No Successors**  
+  - **Query 10**  
+    - **Execution time:** 32.79 s  
+    - **Result:** 649,184  
+    - **Explanation:** Identifies terminal nodes with no outgoing edges.
+
+- **Nodes with No Predecessors**  
+  - **Query 11**  
+    - **Execution time:** 30.90 s  
+    - **Result:** 1,129,781  
+    - **Explanation:** Finds root nodes with no incoming edges.
+
+- **Nodes with the Most Neighbors**  
+  - **Query 12**  
+    - **Execution time:** 115.41 s  
+    - **Result:** `slang`  
+    - **Explanation:** Node with the highest degree of connectivity.
+
+- **Nodes with a Single Neighbor**  
+  - **Query 13**  
+    - **Execution time:** 56.52 s  
+    - **Result:** 1,276,217  
+    - **Explanation:** Indicates sparse or leaf nodes in the graph.
+
+- **Query 14: Rename /c/en/transportation_topic/n**  
+  - Renamed `/c/en/transportation_topic/n`  
+  - **New ID:** new_id  
+  - **New Label:** new_label  
+  - **Explanation:** Indicates a structural update to the knowledge graph, such as normalization or renaming of ambiguous or incorrectly labeled nodes.
+
+- **Similar Nodes to `/c/en/emission_nebula`**  
+  - **Query 15**  
+    - **Execution time:** 13.10 ms  
+    - **Result (sample):** solar nebula, diffuse nebula, protoplanetary nebula, planetary nebula, etc.  
+    - **Explanation:** Uses semantic or lexical similarity to find related nodes.
+
+- **Relatedness Between Two Nodes**  
+  - **Query 16 (Instance 1)**  
+    - Nodes: `/c/en/flower` and `/c/en/spacepower`  
+    - **Execution time:** 15.73 ms  
+    - **Result:** flower, plant, power, spacepower  
+  - **Query 16 (Instance 2)**  
+    - Nodes: `/c/en/uchuva` and `/c/en/square_sails/n`  
+    - **Execution time:** 68.28 ms  
+    - **Result:** uchuva, tomatillo, tomato, square, square sail, etc.  
+    - **Explanation:** Measures conceptual proximity via shared neighbors or embeddings.
+
+- **Distant Synonyms (e.g., `/c/en/defeatable` at distance 2)**  
+  - **Query 17 (Instance 1)**  
+    - **Execution time:** 46.90 ms  
+    - **Result:** conquerable, beatable, surmountable, etc.  
+  - **Query 17 (Instance 2):** `/c/en/telegraphically` at distance 5  
+    - **Execution time:** 346.96 ms  
+    - **Result:** concisely, hastily, quickly, etc.  
+    - **Explanation:** Traverses `Synonym` relations across multiple hops to identify conceptually close terms.
+
+- **Distant Antonyms**  
+  - **Query 18 (Instance 1):** `/c/en/automate` at distance 3  
+    - **Execution time:** 47.44 ms  
+    - **Result:** civilize, tame, personify, etc.  
+  - **Query 18 (Instance 2):** `/c/en/rollercoaster` at distance 6  
+    - **Execution time:** 39.84 s  
+    - **Result:** stand still, stay, unbend, straight, etc.  
+    - **Explanation:** Alternates through `Synonym` and `Antonym` edges; ensures path ends in opposite polarity using modulo logic on antonym edge count.
+
+## 7. [Team Roles and Contributions](#team-roles-and-contributions)
+
+We are **Michał Rawski** and **Alexander Rosol**. We both collaborated to solve the problems, choosing whichever solutions we felt were best. In the end, most of **Michał Rawski**'s contributions were included in the final version, as he has experience with Rust.
+
+**Alexander Rosol** handled testing on a virtual machine and wrote the majority of the documentation with much guidance from **Michał Rawski**, since **Alexander Rosol** is not familiar with Rust.
+
+## 10. [Self-Evaluation](#self-evaluation)
+
+We are happy with how the project went, as we met most milestones—often before they were even checked. Based on feedback and observed behavior, the performance appears to be good, and we believe our implementation is quite efficient.
+
+### Limitations and Identified Shortcomings
+
+One major limitation was running OrientDB on Windows, which led to a number of OS-specific errors. Almost all official documentation and community resources primarily target macOS, and the overall ecosystem is small. This made fixing issues nearly impossible at times. OrientDB itself was frequently the bottleneck in our workflow—for example, using its native seeding process proved so cumbersome that we opted to implement our own solution.
+
+### Ideas for Future Improvements
+
+Looking forward, we would like to implement Write-Ahead Logging (WAL) and configurable cache sizing. However, this depends heavily on the version of OrientDB, and modifying the version can break compatibility with other parts of the system.
 
