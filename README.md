@@ -18,6 +18,10 @@
 - [4. Project Setup and Execution](#4-project-setup-and-execution)
   - [Step-by-Step Guide](#step-by-step-guide)
 
+- [5. Design and Implementation Process](#5-design-and-implementation-process)
+  - [Overview of Design Decisions](#overview-of-design-decisions)
+  - [Implementation Steps and Rationale](#implementation-steps-and-rationale)
+
 ## 1. Choice of Technology
 
 ### Programming Language(s)
@@ -313,3 +317,39 @@ You can rename this binary to `dbcli` if you like:
 mv target/release/orient-rs target/release/dbcli
 ```
 
+## 5. Design and Implementation Process
+
+### Overview of Design Decisions
+
+For our knowledge graph project, we chose **OrientDB** as the database because it naturally supports graph structures, which makes querying and managing linked data more efficient. 
+
+We used **Java 11** as the preferred runtime environment because newer Java versions have compatibility issues with OrientDB. Specifically, some OrientDB versions rely on internal Java APIs or specific JVM behaviors that changed or were deprecated in later Java releases, which can cause unexpected failures.
+
+The key design decision was to optimize data import performance by carefully managing database settings and operations during bulk loading, which is why we used **Rust**. Instead of maintaining indexes during vertex insertions, which slows down inserts, we do not do the index creation until after all data is loaded. This approach improved bulk import speed by a lot.
+
+### Implementation Steps and Rationale
+
+1. **Database Setup**  
+   We start by connecting to the local OrientDB server, dropping any existing database with the same name, and creating a fresh database.
+
+2. **Schema Definition and Configuration**  
+   We define a `Concept` class (vertex) with properties `id` and `label`.  
+   To optimize bulk insertions, we temporarily disable database features like validation and reduce index maintenance overhead.
+
+3. **Data Collection (First Pass)**  
+   We read the knowledge graph TSV file to gather unique vertices and edge classes. For each vertex, we store its best label based on length and alphabetical order. This pre-processing ensures data quality and consistency.
+
+4. **Edge Classes Creation**  
+   After collecting all unique edge classes, we create corresponding edge classes extending from the OrientDB edge type `E`.
+
+5. **Bulk Vertex Creation**  
+   We insert all vertices in bulk without maintaining indexes during insertion. This is achieved by batching the inserts inside a transaction, significantly speeding up the process since index updates are expensive.
+
+6. **Index Creation Post-Insert**  
+   Once all vertices are loaded, we create a unique index on the `id` property of the `Concept` class. Building the index after the bulk insert is faster than updating it incrementally during insertion.
+
+7. **Edge Data Collection and Creation (Second Pass)**  
+   We perform a second pass through the TSV file to collect all edges. Then, edges are created in batches with smaller batch sizes due to the more complex operations and index lookups involved. With the index in place, lookups during edge creation are efficient.
+
+8. **Restoring Production Settings**  
+   After data import, we revert database settings like cache size back to production-appropriate values to ensure durability and performance for normal operations.
